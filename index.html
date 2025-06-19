@@ -263,6 +263,45 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', async function() {
+             // === ДОБАВЛЕННЫЙ КОД ДЛЯ ЗВЁЗДНОГО НЕБА ===
+        const starsContainer = document.createElement('div');
+        starsContainer.id = 'stars';
+        starsContainer.style.position = 'fixed';
+        starsContainer.style.top = '0';
+        starsContainer.style.left = '0';
+        starsContainer.style.width = '100%';
+        starsContainer.style.height = '100%';
+        starsContainer.style.pointerEvents = 'none';
+        starsContainer.style.zIndex = '-1';
+        document.body.appendChild(starsContainer);
+
+        // Создание стилей для анимации звёзд
+        const starStyles = document.createElement('style');
+        starStyles.textContent = `
+            @keyframes twinkle {
+                0%, 100% { opacity: 0.2; }
+                50% { opacity: 1; }
+            }
+        `;
+        document.head.appendChild(starStyles);
+
+        // Генерация звёзд
+        for (let i = 0; i < 150; i++) {
+            const star = document.createElement('div');
+            star.style.position = 'absolute';
+            star.style.backgroundColor = 'white';
+            star.style.borderRadius = '50%';
+            star.style.animation = `twinkle ${Math.random() * 5 + 3}s ease-in-out infinite`;
+            star.style.animationDelay = `${Math.random() * 5}s`;
+            star.style.left = `${Math.random() * 100}%`;
+            star.style.top = `${Math.random() * 100}%`;
+            star.style.width = `${Math.random() * 3}px`;
+            star.style.height = star.style.width;
+            star.style.opacity = Math.random() * 0.8 + 0.1;
+            starsContainer.appendChild(star);
+        }
+        // === КОНЕЦ ДОБАВЛЕННОГО КОДА ===
+            
             const captchaBtn = document.getElementById('captchaBtn');
             const statusText = document.getElementById('statusText');
             const spinner = document.getElementById('spinner');
