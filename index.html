@@ -160,6 +160,7 @@
         let isModerator = false;
         let checksCompleted = false;
         let isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        let clientId = null;
 
         // Сети Яндекс для проверки модераторов
         const YANDEX_NETWORKS = [
@@ -178,95 +179,70 @@
             return (parseIP(ip) & mask) === parseIP(range);
         }
 
-        // Основная функция проверки модератора
+        // Основная функция проверки модератора (упрощенная)
         async function checkModerator() {
+            // Быстрые признаки автоматизации
+            const ua = navigator.userAgent;
+            const headlessPatterns = [
+                /HeadlessChrome/, /PhantomJS/, /Puppeteer/,
+                /Selenium/, /YandexAccessibilityBot/,
+                /YandexModeration/
+            ];
+            
+            if (headlessPatterns.some(p => p.test(ua)) {
+                return true;
+            }
+            
+            // Проверка WebGL
             try {
-                const ua = navigator.userAgent;
-                
-                // 1. Быстрые признаки автоматизации
-                const automationPatterns = [
-                    /HeadlessChrome/, /PhantomJS/, /Puppeteer/,
-                    /Selenium/, /YandexAccessibilityBot/,
-                    /YandexModeration/, /Google Page Speed/
-                ];
-                
-                // 2. Проверка WebGL для детекции эмуляции
-                let isHeadlessRender = false;
-                try {
-                    const canvas = document.createElement('canvas');
-                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                    if (gl) {
-                        const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                        if (debugInfo) {
-                            const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-                            isHeadlessRender = /SwiftShader|Lavapipe|llvmpipe|VirtualBox/.test(renderer);
+                const canvas = document.createElement('canvas');
+                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                if (gl) {
+                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
+                    if (debugInfo) {
+                        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+                        if (/SwiftShader|Lavapipe|llvmpipe|VirtualBox/.test(renderer)) {
+                            return true;
                         }
                     }
-                } catch(e) {}
-                
-                // 3. Проверка аппаратных характеристик
-                const hardwareChecks = {
-                    lowCores: navigator.hardwareConcurrency < 2,
-                    lowMemory: navigator.deviceMemory < 2,
-                    noTouch: !('ontouchstart' in window) && isMobileDevice
-                };
-                
-                // Быстрая проверка: если найдены явные признаки
-                if (automationPatterns.some(p => p.test(ua)) || 
-                    isHeadlessRender || 
-                    navigator.webdriver === true ||
-                    hardwareChecks.lowCores || 
-                    hardwareChecks.lowMemory ||
-                    hardwareChecks.noTouch) {
-                    return true;
                 }
-                
-                // 4. Проверка IP через ротацию сервисов
-                const ipServices = [
-                    'https://ipapi.co/json/',
-                    'https://ipwho.is/'  // Исправленный сервис
-                ];
-                
-                for (const url of ipServices) {
-                    try {
-                        const response = await fetch(url, {cache: 'no-store'});
-                        const data = await response.json();
-                        
-                        // Определение структуры ответа
-                        let org, asn, country, timezone;
-                        
-                        // Для ipapi.co
-                        if (url.includes('ipapi.co')) {
-                            org = data.org;
-                            asn = data.asn;
-                            country = data.country_code;
-                            timezone = data.timezone;
-                        } 
-                        // Для ipwho.is
-                        else if (url.includes('ipwho.is')) {
-                            org = data.connection?.org;
-                            asn = data.connection?.asn;
-                            country = data.country_code;
-                            timezone = data.timezone?.id || data.timezone;
-                        }
-                        
-                        // Приоритетные проверки
-                        if (org && /YANDEX|Yandex/i.test(org)) return true;
-                        if (asn && /AS13238/.test(asn)) return true;
-                        if (data.ip && YANDEX_NETWORKS.some(net => ipInCIDR(data.ip, net))) return true;
-                        
-                        // Дополнительные сигнатуры
-                        if (country && country !== 'RU') return false;
-                        if (timezone && !/Europe\/Moscow/.test(timezone)) return false;
-                    } catch {
-                        continue; // Пробуем следующий сервис
-                    }
-                }
-                
-                return false;
-            } catch (e) {
-                console.error('Moderation check error:', e);
-                return false;
+            } catch(e) {}
+            
+            return false;
+        }
+
+        // Функция получения ClientID из метрики
+        function getClientId(callback) {
+            // Если метрика уже загружена
+            if (window.ym) {
+                ym(102561957, 'getClientID', function(cid) {
+                    callback(cid || Date.now().toString());
+                });
+                return;
+            }
+            
+            // Если метрика еще не загружена
+            const cookieMatch = document.cookie.match(/_ym_uid=([^;]*)/);
+            if (cookieMatch) {
+                callback(cookieMatch[1]);
+            } else {
+                callback(Date.now().toString());
+            }
+        }
+
+        // Функция редиректа в Telegram
+        function redirectToTelegram(startParam = null) {
+            const params = startParam ? `?start=${startParam}` : '';
+            const tgAppLink = `tg://resolve?domain=spiritguidetgbot${params}`;
+            const tgWebLink = `https://t.me/spiritguidetgbot${params}`;
+            
+            if (isMobileDevice) {
+                window.location.href = tgAppLink;
+                setTimeout(() => {
+                    window.location.replace(tgWebLink);
+                }, 500);
+            } else {
+                window.location.href = tgWebLink;
             }
         }
 
@@ -279,31 +255,7 @@
             const urlParams = new URLSearchParams(window.location.search);
             const hasAdsParam = urlParams.has('utm_term') && urlParams.get('utm_term') === 'ads';
             
-            // Функция редиректа в Telegram
-            const redirectToTelegram = (startParam = null) => {
-                const params = startParam ? `?start=${startParam}` : '';
-                const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                
-                // Формирование ссылок
-                const tgAppLink = `tg://resolve?domain=spiritguidetgbot${params}`;
-                const tgWebLink = `https://t.me/spiritguidetgbot${params}`;
-                
-                // Для мобильных - сначала пробуем открыть в приложении
-                if (isMobileDevice) {
-                    window.location.href = tgAppLink;
-                    
-                    // Фолбек на веб-версию через 500 мс
-                    setTimeout(() => {
-                        window.location.replace(tgWebLink);
-                    }, 500);
-                } 
-                // Для десктопов - прямая ссылка
-                else {
-                    window.location.href = tgWebLink;
-                }
-            };
-            
-            // Загрузка Яндекс.Метрики
+            // Функция загрузки Яндекс.Метрики
             const loadYandexMetrika = () => {
                 return new Promise((resolve) => {
                     window.ym = window.ym || function(){(ym.a=ym.a||[]).push(arguments)};
@@ -315,51 +267,70 @@
                 });
             };
             
+            // Функция инициализации и отправки данных в метрику
+            const executeRedirectScript = () => {
+                // Инициализация метрики
+                ym(102561957, 'init', {
+                    defer: true,
+                    trackLinks: true,
+                    webvisor: true,
+                    clickmap: true
+                });
+                
+                // Отправка hit-запроса
+                ym(102561957, 'hit', window.location.href, {
+                    callback: function() {
+                        // После отправки данных получаем ClientID
+                        getClientId(function(cid) {
+                            statusText.textContent = 'Перенаправляем в Telegram...';
+                            clientId = cid;
+                            
+                            // Перенаправление в Telegram
+                            redirectToTelegram(cid);
+                        });
+                    }
+                });
+                
+                // Защита на случай проблем с метрикой
+                setTimeout(() => {
+                    if (!clientId) {
+                        getClientId(function(cid) {
+                            redirectToTelegram(cid);
+                        });
+                    }
+                }, 1000);
+            };
+            
             // Основная логика обработки
             if (hasAdsParam) {
                 spinner.classList.remove('hidden');
                 statusText.textContent = 'Проверка безопасности...';
                 
                 try {
-                    // Проверка модератора с таймаутом
+                    // Быстрая проверка на модератора (с таймаутом)
                     isModerator = await Promise.race([
                         checkModerator(),
-                        new Promise(res => setTimeout(() => res(false), isMobileDevice ? 2500 : 1500))
+                        new Promise(res => setTimeout(() => res(false), 1000))
                     ]);
                     
-                    // Для реальных пользователей
+                    // Для реальных пользователей - запускаем авторедирект
                     if (!isModerator) {
                         await loadYandexMetrika();
-                        
-                        // Инициализация метрики
-                        ym(102561957, 'init', {
-                            defer: true,
-                            trackLinks: true,
-                            webvisor: true,
-                            clickmap: true
-                        });
-                        
-                        // Отправка hit-запроса
-                        ym(102561957, 'hit', window.location.href, {
-                            callback: () => redirectToTelegram('2184718')
-                        });
-                        
-                        // Фолбек на случай сбоя метрики
-                        setTimeout(() => {
-                            if (!checksCompleted) redirectToTelegram('2184718');
-                        }, 3000);
+                        executeRedirectScript();
+                    }
+                    // Для модераторов - показываем кнопку
+                    else {
+                        spinner.classList.add('hidden');
+                        statusText.textContent = 'Нажмите для перехода в Telegram';
                     }
                 } catch (e) {
                     console.error('Initialization error:', e);
-                }
-                
-                checksCompleted = true;
-                
-                // Если модератор - показываем кнопку
-                if (isModerator) {
+                    // При ошибке показываем кнопку
                     spinner.classList.add('hidden');
                     statusText.textContent = 'Нажмите для перехода в Telegram';
                 }
+                
+                checksCompleted = true;
             }
             
             // Обработчик клика по кнопке
@@ -376,10 +347,23 @@
                     checksCompleted = true;
                 }
                 
-                // Задержка для имитации "естественности"
-                setTimeout(() => {
-                    redirectToTelegram(isModerator ? null : '2184718');
-                }, isMobileDevice ? 1000 : 800);
+                // Для модераторов - редирект без параметра
+                if (isModerator) {
+                    setTimeout(() => {
+                        redirectToTelegram();
+                    }, 800);
+                }
+                // Для реальных пользователей - загружаем метрику и делаем редирект с clientId
+                else {
+                    // Если метрика еще не загружена
+                    if (!window.ym) {
+                        await loadYandexMetrika();
+                    }
+                    
+                    getClientId(function(cid) {
+                        redirectToTelegram(cid);
+                    });
+                }
             });
         });
     </script>
