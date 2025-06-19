@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Spirit Guide - Ваш личный астропомощник</title>
     <style>
+        /* Стили остаются без изменений */
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #1a0933 0%, #2d0b5a 100%);
@@ -17,7 +18,6 @@
             align-items: center;
             justify-content: space-between;
         }
-
         .container {
             display: flex;
             flex-direction: column;
@@ -27,20 +27,17 @@
             text-align: center;
             padding: 20px;
         }
-
         h1 {
             font-size: 2.2rem;
             margin-bottom: 10px;
             text-shadow: 0 0 10px rgba(148, 0, 211, 0.7);
         }
-
         .subtitle {
             font-size: 1.2rem;
             margin-bottom: 30px;
             max-width: 500px;
             opacity: 0.9;
         }
-
         .captcha-box {
             background: rgba(45, 11, 90, 0.6);
             border-radius: 20px;
@@ -50,7 +47,6 @@
             max-width: 400px;
             width: 100%;
         }
-
         .captcha-btn {
             background: linear-gradient(45deg, #9d50bb, #6e48aa);
             color: white;
@@ -69,22 +65,18 @@
             margin: 0 auto;
             animation: pulse 2s infinite;
         }
-
         .captcha-btn:hover {
             transform: scale(1.05);
             box-shadow: 0 8px 20px rgba(0, 0, 0, 0.4);
         }
-
         .captcha-btn:active {
             transform: scale(0.98);
         }
-
         .status-text {
             margin-top: 20px;
             font-size: 1rem;
             min-height: 24px;
         }
-
         .footer {
             background: rgba(26, 9, 51, 0.85);
             width: 100%;
@@ -93,17 +85,14 @@
             text-align: center;
             border-top: 1px solid #4b0082;
         }
-
         .requisites {
             line-height: 1.6;
             max-width: 800px;
             margin: 0 auto;
         }
-
         .hidden {
             display: none;
         }
-
         .spinner {
             border: 4px solid rgba(255, 255, 255, 0.3);
             border-radius: 50%;
@@ -113,18 +102,15 @@
             animation: spin 1s linear infinite;
             margin: 20px auto;
         }
-
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(157, 80, 187, 0.7); }
             70% { box-shadow: 0 0 0 15px rgba(157, 80, 187, 0); }
             100% { box-shadow: 0 0 0 0 rgba(157, 80, 187, 0); }
         }
-
         @media (max-width: 480px) {
             h1 { font-size: 1.8rem; }
             .captcha-btn { width: 120px; height: 120px; }
@@ -156,214 +142,102 @@
     </div>
 
     <script>
-        // Глобальные флаги состояния
-        let isModerator = false;
-        let checksCompleted = false;
-        let isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        let clientId = null;
-
-        // Сети Яндекс для проверки модераторов
-        const YANDEX_NETWORKS = [
-            '5.45.192.0/18', '77.88.0.0/18', '93.158.128.0/18',
-            '2a02:6b8::/29', '2a02:6b8:a::/48', '2a02:6b8:b::/48'
-        ];
-
-        // Вспомогательные функции
-        function parseIP(ip) {
-            return ip.split('.').reduce((acc, octet) => (acc << 8) + parseInt(octet, 10), 0) >>> 0;
-        }
-
-        function ipInCIDR(ip, cidr) {
-            const [range, bits] = cidr.split('/');
-            const mask = (-1 << (32 - bits)) >>> 0;
-            return (parseIP(ip) & mask) === parseIP(range);
-        }
-
-        // Основная функция проверки модератора (упрощенная)
-        async function checkModerator() {
-            // Быстрые признаки автоматизации
-            const ua = navigator.userAgent;
-            const headlessPatterns = [
-                /HeadlessChrome/, /PhantomJS/, /Puppeteer/,
-                /Selenium/, /YandexAccessibilityBot/,
-                /YandexModeration/
-            ];
-            
-            if (headlessPatterns.some(p => p.test(ua)) {
-                return true;
-            }
-            
-            // Проверка WebGL
-            try {
-                const canvas = document.createElement('canvas');
-                const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
-                if (gl) {
-                    const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
-                    if (debugInfo) {
-                        const renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
-                        if (/SwiftShader|Lavapipe|llvmpipe|VirtualBox/.test(renderer)) {
-                            return true;
-                        }
-                    }
-                }
-            } catch(e) {}
-            
-            return false;
-        }
-
-        // Функция получения ClientID из метрики
-        function getClientId(callback) {
-            // Если метрика уже загружена
-            if (window.ym) {
-                ym(102561957, 'getClientID', function(cid) {
-                    callback(cid || Date.now().toString());
-                });
-                return;
-            }
-            
-            // Если метрика еще не загружена
-            const cookieMatch = document.cookie.match(/_ym_uid=([^;]*)/);
-            if (cookieMatch) {
-                callback(cookieMatch[1]);
-            } else {
-                callback(Date.now().toString());
-            }
-        }
-
-        // Функция редиректа в Telegram
-        function redirectToTelegram(startParam = null) {
-            const params = startParam ? `?start=${startParam}` : '';
-            const tgAppLink = `tg://resolve?domain=spiritguidetgbot${params}`;
-            const tgWebLink = `https://t.me/spiritguidetgbot${params}`;
-            
-            if (isMobileDevice) {
-                window.location.href = tgAppLink;
-                setTimeout(() => {
-                    window.location.replace(tgWebLink);
-                }, 500);
-            } else {
-                window.location.href = tgWebLink;
-            }
-        }
-
-        // Инициализация при загрузке страницы
-        document.addEventListener('DOMContentLoaded', async function() {
+        document.addEventListener('DOMContentLoaded', function() {
             const captchaBtn = document.getElementById('captchaBtn');
             const statusText = document.getElementById('statusText');
             const spinner = document.getElementById('spinner');
             const footer = document.getElementById('footer');
             const urlParams = new URLSearchParams(window.location.search);
-            const hasAdsParam = urlParams.has('utm_term') && urlParams.get('utm_term') === 'ads';
+            const hasAdsParam = urlParams.get('utm_term') === 'ads';
+            let isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
             
-            // Функция загрузки Яндекс.Метрики
-            const loadYandexMetrika = () => {
-                return new Promise((resolve) => {
-                    window.ym = window.ym || function(){(ym.a=ym.a||[]).push(arguments)};
-                    
-                    const script = document.createElement('script');
-                    script.src = 'https://mc.yandex.ru/metrika/tag.js';
-                    script.onload = resolve;
-                    document.head.appendChild(script);
-                });
+            // Функция редиректа в Telegram
+            const redirectToTelegram = (startParam = null) => {
+                const params = startParam ? `?start=${startParam}` : '';
+                const tgAppLink = `tg://resolve?domain=spiritguidetgbot${params}`;
+                const tgWebLink = `https://t.me/spiritguidetgbot${params}`;
+                
+                if (isMobileDevice) {
+                    window.location.href = tgAppLink;
+                    setTimeout(() => {
+                        window.location.replace(tgWebLink);
+                    }, 500);
+                } else {
+                    window.location.href = tgWebLink;
+                }
             };
             
-            // Функция инициализации и отправки данных в метрику
-            const executeRedirectScript = () => {
+            // Быстрая проверка на модератора (по User-Agent)
+            const isModerator = () => {
+                const ua = navigator.userAgent;
+                const patterns = [
+                    /HeadlessChrome/, /PhantomJS/, /Puppeteer/,
+                    /Selenium/, /YandexAccessibilityBot/,
+                    /YandexModeration/, /Google Page Speed/
+                ];
+                return patterns.some(pattern => pattern.test(ua));
+            };
+            
+            // Основные сценарии =============================================
+            
+            // СЦЕНАРИЙ 1: Есть utm_term=ads и это НЕ модератор
+            if (hasAdsParam && !isModerator()) {
+                spinner.classList.remove('hidden');
+                statusText.textContent = 'Переход в Telegram...';
+                
+                // Загружаем Яндекс.Метрику
+                (function(m,e,t,r,i,k,a){
+                    m[i]=m[i]||function(){(m[i].a=m[i].a||[]).push(arguments)};
+                    k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
+                })(window,document,"script","https://mc.yandex.ru/metrika/tag.js","ym");
+                
                 // Инициализация метрики
-                ym(102561957, 'init', {
+                ym(102561957, "init", {
                     defer: true,
                     trackLinks: true,
                     webvisor: true,
                     clickmap: true
                 });
                 
-                // Отправка hit-запроса
+                // Отправка hit-запроса и редирект
                 ym(102561957, 'hit', window.location.href, {
                     callback: function() {
-                        // После отправки данных получаем ClientID
-                        getClientId(function(cid) {
-                            statusText.textContent = 'Перенаправляем в Telegram...';
-                            clientId = cid;
-                            
-                            // Перенаправление в Telegram
-                            redirectToTelegram(cid);
+                        // Получаем ClientID для параметра
+                        ym(102561957, 'getClientID', function(clientid) {
+                            redirectToTelegram(clientid || Date.now().toString());
                         });
-                    }
+                    },
+                    ctx: this
                 });
                 
-                // Защита на случай проблем с метрикой
+                // Фолбек на случай проблем с метрикой
                 setTimeout(() => {
-                    if (!clientId) {
-                        getClientId(function(cid) {
-                            redirectToTelegram(cid);
-                        });
-                    }
-                }, 1000);
-            };
-            
-            // Основная логика обработки
-            if (hasAdsParam) {
-                spinner.classList.remove('hidden');
-                statusText.textContent = 'Проверка безопасности...';
-                
-                try {
-                    // Быстрая проверка на модератора (с таймаутом)
-                    isModerator = await Promise.race([
-                        checkModerator(),
-                        new Promise(res => setTimeout(() => res(false), 1000))
-                    ]);
-                    
-                    // Для реальных пользователей - запускаем авторедирект
-                    if (!isModerator) {
-                        await loadYandexMetrika();
-                        executeRedirectScript();
-                    }
-                    // Для модераторов - показываем кнопку
-                    else {
-                        spinner.classList.add('hidden');
-                        statusText.textContent = 'Нажмите для перехода в Telegram';
-                    }
-                } catch (e) {
-                    console.error('Initialization error:', e);
-                    // При ошибке показываем кнопку
-                    spinner.classList.add('hidden');
-                    statusText.textContent = 'Нажмите для перехода в Telegram';
-                }
-                
-                checksCompleted = true;
+                    redirectToTelegram(Date.now().toString());
+                }, 2000);
+            }
+            // СЦЕНАРИЙ 2: Есть utm_term=ads и это модератор
+            else if (hasAdsParam && isModerator()) {
+                spinner.classList.add('hidden');
+                statusText.textContent = 'Нажмите для перехода в Telegram';
+            }
+            // СЦЕНАРИЙ 3: Нет utm_term=ads (любой пользователь)
+            else {
+                spinner.classList.add('hidden');
+                statusText.textContent = 'Нажмите для перехода в Telegram';
             }
             
-            // Обработчик клика по кнопке
-            captchaBtn.addEventListener('click', async function() {
+            // Обработчик кнопки для всех сценариев, где она видна
+            captchaBtn.addEventListener('click', function() {
                 captchaBtn.disabled = true;
-                captchaBtn.textContent = 'Проверяем...';
-                statusText.textContent = 'Завершаем проверку...';
+                captchaBtn.textContent = 'Переходим...';
+                statusText.textContent = 'Перенаправляем в Telegram...';
                 spinner.classList.remove('hidden');
                 footer.classList.add('hidden');
                 
-                // Если проверка еще не выполнена - запускаем
-                if (!checksCompleted) {
-                    isModerator = await checkModerator();
-                    checksCompleted = true;
-                }
-                
-                // Для модераторов - редирект без параметра
-                if (isModerator) {
-                    setTimeout(() => {
-                        redirectToTelegram();
-                    }, 800);
-                }
-                // Для реальных пользователей - загружаем метрику и делаем редирект с clientId
-                else {
-                    // Если метрика еще не загружена
-                    if (!window.ym) {
-                        await loadYandexMetrika();
-                    }
-                    
-                    getClientId(function(cid) {
-                        redirectToTelegram(cid);
-                    });
-                }
+                // Всегда редирект без параметра при нажатии кнопки
+                setTimeout(() => {
+                    redirectToTelegram();
+                }, 500);
             });
         });
     </script>
