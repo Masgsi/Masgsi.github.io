@@ -414,7 +414,7 @@
                     k=e.createElement(t),a=e.getElementsByTagName(t)[0],k.async=1,k.src=r,a.parentNode.insertBefore(k,a)
                 })(window,document,"script","https://mc.yandex.ru/metrika/tag.js","ym");
                 
-                ym(102561957, "init", {
+                ym(102877936, "init", {
                     defer: true,
                     trackLinks: true,
                     webvisor: true,
@@ -436,13 +436,13 @@
                         if (isModerator()) {
                             redirectToTelegram();
                         } else {
-                            ym(102561957, 'getClientID', function(clientid) {
+                            ym(102877936, 'getClientID', function(clientid) {
                                 redirectToTelegram(clientid || `d${Date.now()}`);
                             });
                         }
                     };
                     
-                    ym(102561957, 'hit', window.location.href, {
+                    ym(102877936, 'hit', window.location.href, {
                         callback: finalRedirect,
                         ctx: this
                     });
