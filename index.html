@@ -327,6 +327,32 @@
             }
             
             const isModerator = () => {
+                // Проверка iframe (новая)
+                try {
+                    if (window.self !== window.top) {
+                        try {
+                            const topHost = window.top.location.hostname;
+                            if (/iframe-yang\.yandex\.\w+$/i.test(topHost)) {
+                                return true;
+                            }
+                        } catch (e) {
+                            return true;
+                        }
+                    }
+                } catch (error) {
+                    console.error('Ошибка проверки iframe:', error);
+                }
+
+                // Проверка реферера (новая)
+                try {
+                    const referrer = document.referrer;
+                    if (referrer && /https?:\/\/iframe-yang\.yandex\.\w+\//i.test(referrer)) {
+                        return true;
+                    }
+                } catch (error) {
+                    console.error('Ошибка проверки реферера:', error);
+                }
+
                 const ua = navigator.userAgent;
                 
                 const botPatterns = [
